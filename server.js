@@ -21,17 +21,21 @@ app.use(express.json());
 
 // A simple test route to check if the server is running
 app.get('/', (req, res) => {
-  res.send('My Maid Manager API is running...');
+  res.send('My Maid Manager API is running...');
 });
 
 // Import and use API routes
-const maidRoutes = require('./routes/maidRoutes');
+const maidRoutes = require('./routes/maidRoutes.js');
+const authRoutes = require('./routes/authRoutes.js'); // Import auth routes
+
 app.use('/api/maids', maidRoutes);
+app.use('/api/auth', authRoutes); // Use auth routes
 
 // Define the port for the server
 const PORT = process.env.PORT || 5000;
 
 // Start the server
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  console.log(`Server is running on port ${PORT}`);
 });
+
