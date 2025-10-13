@@ -21,7 +21,7 @@ app.use(express.json());
 
 // A simple test route to check if the server is running
 app.get('/', (req, res) => {
-  res.send('My Maid Manager API is running...');
+  res.send('My Maid Manager API is running... demo text');
 });
 
 // Import and use API routes
