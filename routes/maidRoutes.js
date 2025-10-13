@@ -1,10 +1,26 @@
 const express = require('express');
 const router = express.Router();
-const { addMaid, getAllMaids } = require('../controllers/maidController');
+const auth = require('../middleware/authMiddleware');
+const { 
+    getAllMaids, 
+    addMaid,
+    requestAttendanceOtp,
+    verifyOtpAndMarkAttendance
+} = require('../controllers/maidController');
 
-// Route to add a new maid and get all maids
-router.route('/').post(addMaid).get(getAllMaids);
+// All routes here are protected by the auth middleware
 
-// We will add routes for deleting, updating, tasks, and attendance later.
+// Get all maids for a user
+router.get('/', auth, getAllMaids);
+
+// Add a new maid
+router.post('/', auth, addMaid);
+
+// Request an OTP for attendance
+router.post('/request-otp/:maidId', auth, requestAttendanceOtp);
+
+// Verify OTP and mark attendance
+router.post('/verify-otp/:maidId', auth, verifyOtpAndMarkAttendance);
+
 
 module.exports = router;
