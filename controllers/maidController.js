@@ -182,68 +182,107 @@ exports.calculatePayroll = async (req, res) => {
     }
 };
 
-// This function now just ensures the number starts with a '+' as a safety check.
+// Helper function to format phone number to E.164
 const formatToE164 = (phoneNumber) => {
-    // FIX: Add a safety check. If the phone number is missing or not a string, return an empty string.
+    console.log(`[DEBUG] Formatting phone number. Original: "${phoneNumber}"`);
     if (!phoneNumber || typeof phoneNumber !== 'string') {
+        console.log('[DEBUG] Phone number is null, undefined, or not a string. Returning empty.');
         return '';
     }
     if (phoneNumber.startsWith('+')) {
+        console.log('[DEBUG] Phone number already in E.164 format.');
         return phoneNumber;
     }
-    // Fallback for any numbers that might not have it (e.g., old data)
-    return `+${phoneNumber}`;
+    const formatted = `+${phoneNumber}`;
+    console.log(`[DEBUG] Formatted number: "${formatted}"`);
+    return formatted;
+};
+
+// @route   POST api/maids
+// @desc    Add a new maid for the logged-in user
+exports.addMaid = async (req, res) => {
+    console.log('[API] POST /api/maids - Received request to add a new maid.');
+    console.log('[DEBUG] Request Body:', req.body); // Log incoming data
+
+    const { name, mobile, address } = req.body;
+    if (!name || !mobile || !address) {
+        console.error('[ERROR] Validation failed: Missing required fields.');
+        return res.status(400).json({ msg: 'Please enter all fields' });
+    }
+    try {
+        const newMaid = new Maid({ name, mobile, address, user: req.user.id });
+        console.log('[DEBUG] Saving new maid document to database...');
+        const maid = await newMaid.save();
+        console.log('[SUCCESS] Maid saved successfully. Maid ID:', maid.id);
+        res.json(maid);
+    } catch (err) {
+        console.error('[ERROR] Database save error in addMaid:', err.message);
+        res.status(500).send('Server Error');
+    }
 };
 
 // @route   POST api/maids/request-otp/:maidId
 // @desc    Request a verification OTP from Twilio Verify
 exports.requestAttendanceOtp = async (req, res) => {
+    console.log(`[API] POST /api/maids/request-otp/${req.params.maidId} - Received request for OTP.`);
     try {
         const maid = await Maid.findById(req.params.maidId);
-        if (!maid) { return res.status(404).json({ msg: 'Maid not found' }); }
-        if (maid.user.toString() !== req.user.id) { return res.status(401).json({ msg: 'User not authorized' }); }
-
+        if (!maid) {
+            console.error(`[ERROR] Maid not found with ID: ${req.params.maidId}`);
+            return res.status(404).json({ msg: 'Maid not found' });
+        }
+        console.log(`[DEBUG] Found maid: "${maid.name}". Checking mobile number.`);
+        
         const formattedPhoneNumber = formatToE164(maid.mobile);
 
-        // FIX: Add a check to ensure the phone number is valid before calling Twilio
         if (!formattedPhoneNumber) {
+            console.error(`[ERROR] Maid "${maid.name}" has an invalid or missing mobile number.`);
             return res.status(400).json({ msg: 'Maid does not have a valid mobile number.' });
         }
 
+        console.log(`[DEBUG] Requesting OTP from Twilio for number: ${formattedPhoneNumber}`);
         await twilioClient.verify.v2.services(verifyServiceSid)
             .verifications
             .create({ to: formattedPhoneNumber, channel: 'sms' });
         
+        console.log(`[SUCCESS] Twilio accepted the request to send OTP to ${formattedPhoneNumber}.`);
         res.json({ msg: `A verification code has been sent to ${maid.mobile}.` });
 
     } catch (err) {
-        console.error("Twilio Verify Error:", err.message);
-        // Provide a more user-friendly error if the number format is the issue
-        if (err.code === 21211) { // Twilio's specific error code for invalid 'To' number
-             return res.status(400).send('Invalid phone number format. Ensure it includes a country code.');
+        console.error("[ERROR] Twilio Verify API Error:", err.message);
+        if (err.code === 21211) {
+             return res.status(400).send('Invalid phone number format. Twilio rejected the number.');
         }
         res.status(500).send('Failed to send verification code.');
     }
 };
 
-
 // @route   POST api/maids/verify-otp/:maidId
 // @desc    Verify the OTP with Twilio and mark attendance
 exports.verifyOtpAndMarkAttendance = async (req, res) => {
     const { otp, taskName } = req.body;
+    console.log(`[API] POST /api/maids/verify-otp/${req.params.maidId} - Received request to verify OTP.`);
+    console.log(`[DEBUG] OTP: "${otp}", Task: "${taskName}"`);
+
     try {
         const maid = await Maid.findById(req.params.maidId);
-        if (!maid) { return res.status(404).json({ msg: 'Maid not found' }); }
+        if (!maid) {
+            console.error(`[ERROR] Maid not found with ID: ${req.params.maidId}`);
+            return res.status(404).json({ msg: 'Maid not found' });
+        }
 
         const formattedPhoneNumber = formatToE164(maid.mobile);
-        
         if (!formattedPhoneNumber) {
+            console.error(`[ERROR] Cannot verify OTP for maid "${maid.name}" with no mobile number.`);
             return res.status(400).json({ msg: 'Cannot verify OTP for a maid with no mobile number.' });
         }
 
+        console.log(`[DEBUG] Sending verification check to Twilio for number: ${formattedPhoneNumber}`);
         const verification_check = await twilioClient.verify.v2.services(verifyServiceSid)
             .verificationChecks
             .create({ to: formattedPhoneNumber, code: otp });
+        
+        console.log(`[DEBUG] Twilio verification status: "${verification_check.status}"`);
 
         if (verification_check.status === 'approved') {
             maid.attendance.unshift({
@@ -252,13 +291,15 @@ exports.verifyOtpAndMarkAttendance = async (req, res) => {
                 status: 'Present'
             });
             await maid.save();
+            console.log(`[SUCCESS] Attendance marked for "${maid.name}" for task "${taskName}".`);
             res.json({ msg: `Attendance for ${maid.name} marked successfully.` });
         } else {
+            console.warn(`[WARN] OTP verification failed for maid "${maid.name}". Status: ${verification_check.status}`);
             res.status(400).json({ msg: 'The OTP you entered is incorrect.' });
         }
 
     } catch (err) {
-        console.error("Twilio Verification Check Error:", err.message);
+        console.error("[ERROR] Twilio Verification Check Error:", err.message);
         res.status(500).send('Server error during OTP verification.');
     }
 };
