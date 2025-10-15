@@ -182,6 +182,15 @@ exports.calculatePayroll = async (req, res) => {
     }
 };
 
+// This function now just ensures the number starts with a '+' as a safety check.
+const formatToE164 = (phoneNumber) => {
+    if (phoneNumber.startsWith('+')) {
+        return phoneNumber;
+    }
+    // Fallback for any numbers that might not have it (e.g., old data)
+    return `+${phoneNumber}`;
+};
+
 // @route   POST api/maids/request-otp/:maidId
 // @desc    Request a verification OTP from Twilio Verify
 exports.requestAttendanceOtp = async (req, res) => {
@@ -190,16 +199,18 @@ exports.requestAttendanceOtp = async (req, res) => {
         if (!maid) { return res.status(404).json({ msg: 'Maid not found' }); }
         if (maid.user.toString() !== req.user.id) { return res.status(401).json({ msg: 'User not authorized' }); }
 
-        // --- NEW TWILIO VERIFY LOGIC ---
+        // Use the simplified helper function. It expects a number like "+919876543210" from the app.
+        const formattedPhoneNumber = formatToE164(maid.mobile);
+
         await twilioClient.verify.v2.services(verifyServiceSid)
             .verifications
-            .create({ to: maid.mobile, channel: 'sms' });
+            .create({ to: formattedPhoneNumber, channel: 'sms' });
         
         res.json({ msg: `A verification code has been sent to ${maid.mobile}.` });
 
     } catch (err) {
         console.error("Twilio Verify Error:", err.message);
-        res.status(500).send('Failed to send verification code. Ensure the phone number is in E.164 format (e.g., +919876543210).');
+        res.status(500).send('Failed to send verification code. Ensure the phone number is valid and includes the country code.');
     }
 };
 
@@ -212,13 +223,14 @@ exports.verifyOtpAndMarkAttendance = async (req, res) => {
         const maid = await Maid.findById(req.params.maidId);
         if (!maid) { return res.status(404).json({ msg: 'Maid not found' }); }
 
-        // --- NEW TWILIO VERIFY LOGIC ---
+        // Use the simplified helper function here as well.
+        const formattedPhoneNumber = formatToE164(maid.mobile);
+
         const verification_check = await twilioClient.verify.v2.services(verifyServiceSid)
             .verificationChecks
-            .create({ to: maid.mobile, code: otp });
+            .create({ to: formattedPhoneNumber, code: otp });
 
         if (verification_check.status === 'approved') {
-            // OTP is correct, mark attendance
             maid.attendance.unshift({
                 date: new Date(),
                 taskName: taskName,
@@ -227,7 +239,6 @@ exports.verifyOtpAndMarkAttendance = async (req, res) => {
             await maid.save();
             res.json({ msg: `Attendance for ${maid.name} marked successfully.` });
         } else {
-            // OTP is incorrect
             res.status(400).json({ msg: 'The OTP you entered is incorrect.' });
         }
 
