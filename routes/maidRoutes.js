@@ -4,6 +4,7 @@ const auth = require('../middleware/authMiddleware');
 const { 
     getAllMaids,
     addMaid,
+    getMaidById,
     addTaskToMaid,
     deleteTaskFromMaid,
     calculatePayroll, // Import the new function
@@ -15,6 +16,8 @@ const {
 
 router.get('/', auth, getAllMaids);
 router.post('/', auth, addMaid);
+
+router.get('/:maidId', auth, getMaidById);
 
 // New route for payroll calculation
 router.get('/:maidId/payroll', auth, calculatePayroll);

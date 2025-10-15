@@ -13,6 +13,34 @@ exports.getAllMaids = async (req, res) => {
     }
 };
 
+// @route   GET api/maids/:maidId
+// @desc    Get a single maid by their ID
+// @access  Private
+exports.getMaidById = async (req, res) => {
+    try {
+        const maid = await Maid.findById(req.params.maidId);
+
+        // Check if maid exists
+        if (!maid) {
+            return res.status(404).json({ msg: 'Maid not found' });
+        }
+
+        // Check if the maid belongs to the user making the request
+        if (maid.user.toString() !== req.user.id) {
+            return res.status(401).json({ msg: 'User not authorized' });
+        }
+
+        res.json(maid);
+    } catch (err) {
+        console.error(err.message);
+        // If the ID format is invalid, Mongoose throws an error
+        if (err.kind === 'ObjectId') {
+             return res.status(404).json({ msg: 'Maid not found' });
+        }
+        res.status(500).send('Server Error');
+    }
+};
+
 // @route   POST api/maids
 // @desc    Add a new maid for the logged-in user
 exports.addMaid = async (req, res) => {
