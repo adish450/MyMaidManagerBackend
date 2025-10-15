@@ -45,20 +45,18 @@ exports.getMaidById = async (req, res) => {
 
 // @route   POST api/maids
 // @desc    Add a new maid for the logged-in user
-exports.addMaid = async (req, res) => {
-    const { name, mobile, address } = req.body;
-    if (!name || !mobile || !address) {
+const { name, mobileNo, address } = req.body;
+    if (!name || !mobileNo || !address) {
         return res.status(400).json({ msg: 'Please enter all fields' });
     }
     try {
-        const newMaid = new Maid({ name, mobile, address, user: req.user.id });
+        const newMaid = new Maid({ name, mobileNo, address, user: req.user.id });
         const maid = await newMaid.save();
         res.json(maid);
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server Error');
     }
-};
 
 // @route   POST api/maids/:maidId/tasks
 // @desc    Add a task to a specific maid
