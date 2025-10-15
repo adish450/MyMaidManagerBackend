@@ -45,7 +45,8 @@ exports.getMaidById = async (req, res) => {
 
 // @route   POST api/maids
 // @desc    Add a new maid for the logged-in user
-const { name, mobileNo, address } = req.body;
+exports.addMaid = async (req, res) => {
+    const { name, mobileNo, address } = req.body;
     if (!name || !mobileNo || !address) {
         return res.status(400).json({ msg: 'Please enter all fields' });
     }
@@ -57,6 +58,7 @@ const { name, mobileNo, address } = req.body;
         console.error(err.message);
         res.status(500).send('Server Error');
     }
+};
 
 // @route   POST api/maids/:maidId/tasks
 // @desc    Add a task to a specific maid
