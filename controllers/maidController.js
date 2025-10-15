@@ -184,6 +184,10 @@ exports.calculatePayroll = async (req, res) => {
 
 // This function now just ensures the number starts with a '+' as a safety check.
 const formatToE164 = (phoneNumber) => {
+    // FIX: Add a safety check. If the phone number is missing or not a string, return an empty string.
+    if (!phoneNumber || typeof phoneNumber !== 'string') {
+        return '';
+    }
     if (phoneNumber.startsWith('+')) {
         return phoneNumber;
     }
@@ -199,8 +203,12 @@ exports.requestAttendanceOtp = async (req, res) => {
         if (!maid) { return res.status(404).json({ msg: 'Maid not found' }); }
         if (maid.user.toString() !== req.user.id) { return res.status(401).json({ msg: 'User not authorized' }); }
 
-        // Use the simplified helper function. It expects a number like "+919876543210" from the app.
         const formattedPhoneNumber = formatToE164(maid.mobile);
+
+        // FIX: Add a check to ensure the phone number is valid before calling Twilio
+        if (!formattedPhoneNumber) {
+            return res.status(400).json({ msg: 'Maid does not have a valid mobile number.' });
+        }
 
         await twilioClient.verify.v2.services(verifyServiceSid)
             .verifications
@@ -210,7 +218,11 @@ exports.requestAttendanceOtp = async (req, res) => {
 
     } catch (err) {
         console.error("Twilio Verify Error:", err.message);
-        res.status(500).send('Failed to send verification code. Ensure the phone number is valid and includes the country code.');
+        // Provide a more user-friendly error if the number format is the issue
+        if (err.code === 21211) { // Twilio's specific error code for invalid 'To' number
+             return res.status(400).send('Invalid phone number format. Ensure it includes a country code.');
+        }
+        res.status(500).send('Failed to send verification code.');
     }
 };
 
@@ -223,8 +235,11 @@ exports.verifyOtpAndMarkAttendance = async (req, res) => {
         const maid = await Maid.findById(req.params.maidId);
         if (!maid) { return res.status(404).json({ msg: 'Maid not found' }); }
 
-        // Use the simplified helper function here as well.
         const formattedPhoneNumber = formatToE164(maid.mobile);
+        
+        if (!formattedPhoneNumber) {
+            return res.status(400).json({ msg: 'Cannot verify OTP for a maid with no mobile number.' });
+        }
 
         const verification_check = await twilioClient.verify.v2.services(verifyServiceSid)
             .verificationChecks
