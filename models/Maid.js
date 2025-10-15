@@ -17,15 +17,8 @@ const MaidSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
     },
-    // New fields for OTP-based attendance
-    otp: {
-        type: String,
-    },
-    otpExpires: {
-        type: Date,
-    },
-    // Future fields for tasks and attendance records
     tasks: [{
+        _id: mongoose.Schema.Types.ObjectId,
         name: String,
         price: Number,
         frequency: String
@@ -33,7 +26,7 @@ const MaidSchema = new mongoose.Schema({
     attendance: [{
         date: Date,
         taskName: String,
-        status: String // e.g., 'Present', 'Absent'
+        status: String
     }]
 });
 

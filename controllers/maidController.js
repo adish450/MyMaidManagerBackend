@@ -1,5 +1,7 @@
 const Maid = require('../models/Maid');
-const otpGenerator = require('otp-generator');
+const twilio = require('twilio');
+const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
 
 // @route   GET api/maids
 // @desc    Get all maids for the logged-in user
@@ -181,61 +183,56 @@ exports.calculatePayroll = async (req, res) => {
 };
 
 // @route   POST api/maids/request-otp/:maidId
-// @desc    Generate and send an OTP to the maid's mobile for attendance
+// @desc    Request a verification OTP from Twilio Verify
 exports.requestAttendanceOtp = async (req, res) => {
     try {
         const maid = await Maid.findById(req.params.maidId);
         if (!maid) { return res.status(404).json({ msg: 'Maid not found' }); }
         if (maid.user.toString() !== req.user.id) { return res.status(401).json({ msg: 'User not authorized' }); }
 
-        const otp = otpGenerator.generate(6, { 
-            upperCaseAlphabets: false, 
-            specialChars: false,
-            lowerCaseAlphabets: false
-        });
-
-        maid.otp = otp;
-        maid.otpExpires = Date.now() + 5 * 60 * 1000; // 5 minutes
-        await maid.save();
-
-        console.log(`SIMULATING SMS to ${maid.mobile}: Your attendance OTP is ${otp}`);
-        res.json({ msg: `OTP sent to ${maid.mobile}. It will expire in 5 minutes.` });
+        // --- NEW TWILIO VERIFY LOGIC ---
+        await twilioClient.verify.v2.services(verifyServiceSid)
+            .verifications
+            .create({ to: maid.mobile, channel: 'sms' });
+        
+        res.json({ msg: `A verification code has been sent to ${maid.mobile}.` });
 
     } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server Error');
+        console.error("Twilio Verify Error:", err.message);
+        res.status(500).send('Failed to send verification code. Ensure the phone number is in E.164 format (e.g., +919876543210).');
     }
 };
 
+
 // @route   POST api/maids/verify-otp/:maidId
-// @desc    Verify OTP and mark attendance
+// @desc    Verify the OTP with Twilio and mark attendance
 exports.verifyOtpAndMarkAttendance = async (req, res) => {
     const { otp, taskName } = req.body;
     try {
         const maid = await Maid.findById(req.params.maidId);
         if (!maid) { return res.status(404).json({ msg: 'Maid not found' }); }
 
-        if (maid.otp !== otp || maid.otpExpires < Date.now()) {
-            maid.otp = undefined;
-            maid.otpExpires = undefined;
+        // --- NEW TWILIO VERIFY LOGIC ---
+        const verification_check = await twilioClient.verify.v2.services(verifyServiceSid)
+            .verificationChecks
+            .create({ to: maid.mobile, code: otp });
+
+        if (verification_check.status === 'approved') {
+            // OTP is correct, mark attendance
+            maid.attendance.unshift({
+                date: new Date(),
+                taskName: taskName,
+                status: 'Present'
+            });
             await maid.save();
-            return res.status(400).json({ msg: 'OTP is invalid or has expired' });
+            res.json({ msg: `Attendance for ${maid.name} marked successfully.` });
+        } else {
+            // OTP is incorrect
+            res.status(400).json({ msg: 'The OTP you entered is incorrect.' });
         }
 
-        maid.attendance.unshift({
-            date: new Date(),
-            taskName: taskName,
-            status: 'Present'
-        });
-
-        maid.otp = undefined;
-        maid.otpExpires = undefined;
-        await maid.save();
-
-        res.json({ msg: `Attendance for ${maid.name} marked successfully.` });
-
     } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server Error');
+        console.error("Twilio Verification Check Error:", err.message);
+        res.status(500).send('Server error during OTP verification.');
     }
 };
