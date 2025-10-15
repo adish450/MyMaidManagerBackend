@@ -204,13 +204,13 @@ exports.addMaid = async (req, res) => {
     console.log('[API] POST /api/maids - Received request to add a new maid.');
     console.log('[DEBUG] Request Body:', req.body); // Log incoming data
 
-    const { name, mobile, address } = req.body;
-    if (!name || !mobile || !address) {
+    const { name, mobileNo, address } = req.body;
+    if (!name || !mobileNo || !address) {
         console.error('[ERROR] Validation failed: Missing required fields.');
         return res.status(400).json({ msg: 'Please enter all fields' });
     }
     try {
-        const newMaid = new Maid({ name, mobile, address, user: req.user.id });
+        const newMaid = new Maid({ name, mobileNo, address, user: req.user.id });
         console.log('[DEBUG] Saving new maid document to database...');
         const maid = await newMaid.save();
         console.log('[SUCCESS] Maid saved successfully. Maid ID:', maid.id);
@@ -233,7 +233,7 @@ exports.requestAttendanceOtp = async (req, res) => {
         }
         console.log(`[DEBUG] Found maid: "${maid.name}". Checking mobile number.`);
         
-        const formattedPhoneNumber = formatToE164(maid.mobile);
+        const formattedPhoneNumber = formatToE164(maid.mobileNo);
 
         if (!formattedPhoneNumber) {
             console.error(`[ERROR] Maid "${maid.name}" has an invalid or missing mobile number.`);
@@ -246,7 +246,7 @@ exports.requestAttendanceOtp = async (req, res) => {
             .create({ to: formattedPhoneNumber, channel: 'sms' });
         
         console.log(`[SUCCESS] Twilio accepted the request to send OTP to ${formattedPhoneNumber}.`);
-        res.json({ msg: `A verification code has been sent to ${maid.mobile}.` });
+        res.json({ msg: `A verification code has been sent to ${maid.mobileNo}.` });
 
     } catch (err) {
         console.error("[ERROR] Twilio Verify API Error:", err.message);
@@ -271,7 +271,7 @@ exports.verifyOtpAndMarkAttendance = async (req, res) => {
             return res.status(404).json({ msg: 'Maid not found' });
         }
 
-        const formattedPhoneNumber = formatToE164(maid.mobile);
+        const formattedPhoneNumber = formatToE164(maid.mobileNo);
         if (!formattedPhoneNumber) {
             console.error(`[ERROR] Cannot verify OTP for maid "${maid.name}" with no mobile number.`);
             return res.status(400).json({ msg: 'Cannot verify OTP for a maid with no mobile number.' });
