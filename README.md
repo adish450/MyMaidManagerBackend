@@ -37,7 +37,7 @@ This is the Node.js backend API that serves the My Maid Manager Android applicat
 ## **🚀 Setup**
 
 1. **Clone the repository:**  
-   git clone \<your-backend-repo-url\>  
+   git clone https://github.com/adish450/MyMaidManagerBackend
    cd MyMaidManagerBackend
 
 2. **Install dependencies:**  
@@ -67,5 +67,3 @@ JWT\_SECRET=your\_super\_secret\_jwt\_key\_that\_is\_long\_and\_random
 TWILIO\_ACCOUNT\_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  
 TWILIO\_AUTH\_TOKEN=your\_twilio\_auth\_token  
 TWILIO\_VERIFY\_SERVICE\_SID=VAxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-
-*(Optional: Add sections for Contributing, License)*
