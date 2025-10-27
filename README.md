@@ -40,13 +40,13 @@ This is the Node.js backend API that serves the My Maid Manager Android applicat
    git clone https://github.com/adish450/MyMaidManagerBackend
    cd MyMaidManagerBackend
 
-2. **Install dependencies:**  
+3. **Install dependencies:**  
    npm install
 
-3. **Create .env file:**  
+4. **Create .env file:**  
    * Copy the contents of .env.example into a new file named .env.  
    * Fill in the required environment variables (see below).  
-4. **Run the server:**  
+5. **Run the server:**  
    * For development (with auto-reload using nodemon): npm run dev  
    * For production: npm start  
    * **Recommended for Deployment:** Use PM2:  
