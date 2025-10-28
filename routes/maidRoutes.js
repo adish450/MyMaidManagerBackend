@@ -7,7 +7,8 @@ const {
     getMaidById,
     addTaskToMaid,
     deleteTaskFromMaid,
-    calculatePayroll, // Import the new function
+    calculatePayroll,
+    addManualAttendanceRecord,
     requestAttendanceOtp,
     verifyOtpAndMarkAttendance
 } = require('../controllers/maidController');
