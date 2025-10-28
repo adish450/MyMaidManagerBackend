@@ -22,6 +22,8 @@ router.get('/:maidId', auth, getMaidById);
 // New route for payroll calculation
 router.get('/:maidId/payroll', auth, calculatePayroll);
 
+router.post('/:maidId/attendance/manual', auth, addManualAttendanceRecord);
+
 router.post('/:maidId/tasks', auth, addTaskToMaid);
 router.delete('/:maidId/tasks/:taskId', auth, deleteTaskFromMaid);
 

@@ -303,3 +303,54 @@ exports.verifyOtpAndMarkAttendance = async (req, res) => {
         res.status(500).send('Server error during OTP verification.');
     }
 };
+
+// @route   POST api/maids/:maidId/attendance/manual
+// @desc    Manually add an attendance record (e.g., mark as Absent)
+// @access  Private
+exports.addManualAttendanceRecord = async (req, res) => {
+    const { date, taskName, status } = req.body; // Expecting date in 'YYYY-MM-DD' format
+    console.log('[API] POST /api/maids/:maidId/attendance/manual - Received request.');
+    console.log('[DEBUG] Request Body:', req.body);
+
+    if (!date || !taskName || !status) {
+        console.error('[ERROR] Validation failed: Missing date, taskName, or status.');
+        return res.status(400).json({ msg: 'Please provide date, task name, and status (e.g., Absent).' });
+    }
+
+    try {
+        const maid = await Maid.findById(req.params.maidId);
+        if (!maid) {
+            console.error(`[ERROR] Maid not found with ID: ${req.params.maidId}`);
+            return res.status(404).json({ msg: 'Maid not found' });
+        }
+        if (maid.user.toString() !== req.user.id) {
+            console.error(`[ERROR] User ${req.user.id} not authorized for maid ${req.params.maidId}`);
+            return res.status(401).json({ msg: 'User not authorized' });
+        }
+
+        // Convert YYYY-MM-DD string to a Date object at the start of that day (UTC)
+        const attendanceDate = new Date(Date.parse(date + 'T00:00:00.000Z'));
+        if (isNaN(attendanceDate)) {
+             console.error(`[ERROR] Invalid date format received: ${date}`);
+             return res.status(400).json({ msg: 'Invalid date format. Please use YYYY-MM-DD.' });
+        }
+
+
+        // Optional: Check if a record for this task on this day already exists?
+        // For simplicity, we'll allow multiple records for now, but you might want to prevent duplicates.
+
+        maid.attendance.unshift({
+            date: attendanceDate,
+            taskName: taskName,
+            status: status // Allows 'Absent' or potentially other statuses
+        });
+
+        await maid.save();
+        console.log(`[SUCCESS] Manual attendance record added for maid "${maid.name}".`);
+        res.json(maid.attendance); // Return the updated attendance list
+
+    } catch (err) {
+        console.error('[ERROR] Database save error in addManualAttendanceRecord:', err.message);
+        res.status(500).send('Server Error');
+    }
+};
