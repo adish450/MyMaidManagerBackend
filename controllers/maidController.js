@@ -161,7 +161,7 @@ exports.addTaskToMaid = async (req, res) => {
         maid.tasks.unshift({ _id: newTaskId, name, price, frequency });
 
         await maid.save();
-        res.json(maid.tasks); // Send back the updated tasks array
+        res.json(maid); // Send back the entire updated maid object
 
     } catch (err) {
         console.error(err.message);
