@@ -249,14 +249,32 @@ exports.calculatePayroll = async (req, res) => {
         let totalSalary = 0;
         let totalDeductions = 0;
         const deductionsBreakdown = [];
+        
         for (const task of maid.tasks) {
             totalSalary += task.price;
+            
             let expectedWorkDays = 0;
-            if (task.frequency.toLowerCase() === 'daily') expectedWorkDays = daysInMonth;
-            else if (task.frequency.toLowerCase().includes('alternate')) expectedWorkDays = Math.ceil(daysInMonth / 2);
-            else if (task.frequency.toLowerCase() === 'weekly') expectedWorkDays = 4;
-            else expectedWorkDays = daysInMonth;
+            const frequency = task.frequency.toLowerCase();
+
+            // --- Updated Payroll Logic ---
+            if (frequency === 'daily') {
+                expectedWorkDays = daysInMonth;
+            } else if (frequency.includes('alternate')) { // Handles "Alternate Days"
+                expectedWorkDays = Math.ceil(daysInMonth / 2);
+            } else if (frequency === 'weekly') {
+                expectedWorkDays = 4; // Assuming 4 weeks in a month
+            } else if (frequency === 'bi-weekly') { // Correctly handles "Bi-weekly"
+                expectedWorkDays = 2; // As 2 days per month
+            } else if (frequency === 'monthly') { // Correctly handles "Monthly"
+                expectedWorkDays = 1; // As 1 day per month
+            } else {
+                // Default fallback (e.g., if frequency is not set, assume daily)
+                expectedWorkDays = daysInMonth; 
+            }
+            // --- End of Updated Logic ---
+
             const costPerDay = expectedWorkDays > 0 ? task.price / expectedWorkDays : 0;
+            
             // Filter for 'Present' status
             const daysWorked = maid.attendance.filter(r => 
                 r.taskName === task.name && 
@@ -264,6 +282,7 @@ exports.calculatePayroll = async (req, res) => {
                 new Date(r.date) >= startDate && 
                 new Date(r.date) < endDate
             ).length;
+
             const missedDays = expectedWorkDays - daysWorked;
             if (missedDays > 0) {
                 const deduction = missedDays * costPerDay;
@@ -316,7 +335,7 @@ exports.verifyOtpAndMarkAttendance = async (req, res) => {
     const { otp, taskName } = req.body;
     try {
         const maid = await Maid.findById(req.params.maidId);
-        if (!maid) { return res.status(404).json({ msg: 'Maid not found' }); }
+        if (!maid) { return res.status(4404).json({ msg: 'Maid not found' }); }
 
         const formattedPhoneNumber = formatToE164(maid.mobile);
         if (!formattedPhoneNumber) {
