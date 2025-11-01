@@ -8,6 +8,7 @@ const {
     updateMaid,
     deleteMaid,
     addTaskToMaid,
+    updateTask,
     deleteTaskFromMaid,
     calculatePayroll,
     addManualAttendanceRecord,
@@ -27,6 +28,7 @@ router.put('/:maidId', auth, updateMaid);
 router.delete('/:maidId', auth, deleteMaid);
 
 router.post('/:maidId/tasks', auth, addTaskToMaid);
+router.put('/:maidId/tasks/:taskId', auth, updateTask);
 router.delete('/:maidId/tasks/:taskId', auth, deleteTaskFromMaid);
 
 router.post('/:maidId/attendance/manual', auth, addManualAttendanceRecord);

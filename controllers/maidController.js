@@ -165,6 +165,48 @@ exports.addTaskToMaid = async (req, res) => {
     }
 };
 
+// @route   PUT api/maids/:maidId/tasks/:taskId
+// @desc    Update a specific task for a maid
+// @access  Private
+exports.updateTask = async (req, res) => {
+    const { name, price, frequency } = req.body;
+    const { maidId, taskId } = req.params;
+
+    if (!name || !price || !frequency) {
+        return res.status(400).json({ msg: 'Please provide name, price, and frequency.' });
+    }
+
+    try {
+        const maid = await Maid.findById(maidId);
+        if (!maid) { 
+            return res.status(404).json({ msg: 'Maid not found' }); 
+        }
+        if (maid.user.toString() !== req.user.id) { 
+            return res.status(401).json({ msg: 'User not authorized' }); 
+        }
+
+        // Find the task within the maid's tasks array
+        const task = maid.tasks.id(taskId);
+        if (!task) {
+            return res.status(404).json({ msg: 'Task not found' });
+        }
+
+        // Update the task properties
+        task.name = name;
+        task.price = price;
+        task.frequency = frequency;
+
+        await maid.save();
+        
+        // Return the updated maid document
+        res.json(maid);
+
+    } catch (err) {
+        console.error('[ERROR] Database update error in updateTask:', err.message);
+        res.status(500).send('Server Error');
+    }
+};
+
 // @route   DELETE api/maids/:maidId/tasks/:taskId
 // @desc    Delete a task from a maid
 exports.deleteTaskFromMaid = async (req, res) => {
