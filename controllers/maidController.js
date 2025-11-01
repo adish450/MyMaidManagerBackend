@@ -335,7 +335,7 @@ exports.verifyOtpAndMarkAttendance = async (req, res) => {
     const { otp, taskName } = req.body;
     try {
         const maid = await Maid.findById(req.params.maidId);
-        if (!maid) { return res.status(4404).json({ msg: 'Maid not found' }); }
+        if (!maid) { return res.status(404).json({ msg: 'Maid not found' }); }
 
         const formattedPhoneNumber = formatToE164(maid.mobile);
         if (!formattedPhoneNumber) {
@@ -365,15 +365,15 @@ exports.verifyOtpAndMarkAttendance = async (req, res) => {
 };
 
 // @route   POST api/maids/:maidId/attendance/manual
-// @desc    Manually add an attendance record (e.g., mark as Absent)
+// @desc    Manually add a "Present" attendance record
 exports.addManualAttendanceRecord = async (req, res) => {
-    const { date, taskName, status } = req.body; 
+    const { date, taskName, status } = req.body; // Status will be received, but we'll ignore it
     console.log('[API] POST /api/maids/:maidId/attendance/manual - Received request.');
     console.log('[DEBUG] Request Body:', req.body);
 
-    if (!date || !taskName || !status) {
+    if (!date || !taskName || !status) { // Keep status in validation as frontend sends it
         console.error('[ERROR] Validation failed: Missing date, taskName, or status.');
-        return res.status(400).json({ msg: 'Please provide date, task name, and status (e.g., Absent).' });
+        return res.status(400).json({ msg: 'Please provide date, task name, and status.' });
     }
 
     try {
@@ -397,11 +397,11 @@ exports.addManualAttendanceRecord = async (req, res) => {
         maid.attendance.unshift({
             date: attendanceDate,
             taskName: taskName,
-            status: status
+            status: 'Present' // --- LOGIC CHANGE: Always mark as 'Present' ---
         });
 
         await maid.save();
-        console.log(`[SUCCESS] Manual attendance record added for maid "${maid.name}".`);
+        console.log(`[SUCCESS] Manual 'Present' record added for maid "${maid.name}".`);
         res.json(maid.attendance); // Return the updated attendance list
 
     } catch (err) {
