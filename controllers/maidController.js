@@ -1,4 +1,5 @@
 const Maid = require('../models/Maid');
+const mongoose = require('mongoose'); // Import mongoose
 const twilio = require('twilio');
 
 // Initialize Twilio client
@@ -62,7 +63,8 @@ exports.addMaid = async (req, res) => {
         return res.status(400).json({ msg: 'Please provide name, mobile, and address.' });
     }
     try {
-        const newMaid = new Maid({ name, mobile, address, user: req.user.id });
+        // --- FIX: Use 'mobileNo' to match the schema ---
+        const newMaid = new Maid({ name, mobileNo: mobile, address, user: req.user.id });
         console.log('[DEBUG] Saving new maid document to database...');
         const maid = await newMaid.save();
         console.log('[SUCCESS] Maid saved successfully. Maid ID:', maid.id);
@@ -83,7 +85,8 @@ exports.updateMaid = async (req, res) => {
     // Build maid object
     const maidFields = {};
     if (name) maidFields.name = name;
-    if (mobile) maidFields.mobile = mobile;
+    // --- FIX: Use 'mobileNo' to match the schema ---
+    if (mobile) maidFields.mobileNo = mobile;
     if (address) maidFields.address = address;
 
     try {
@@ -155,9 +158,12 @@ exports.addTaskToMaid = async (req, res) => {
         if (!maid) { return res.status(404).json({ msg: 'Maid not found' }); }
         if (maid.user.toString() !== req.user.id) { return res.status(401).json({ msg: 'User not authorized' }); }
 
-        maid.tasks.unshift({ name, price, frequency });
+        // Create a new mongoose.Types.ObjectId for the task _id
+        const newTaskId = new mongoose.Types.ObjectId();
+        maid.tasks.unshift({ _id: newTaskId, name, price, frequency });
+
         await maid.save();
-        res.json(maid.tasks);
+        res.json(maid.tasks); // Send back the updated tasks array
 
     } catch (err) {
         console.error(err.message);
@@ -207,6 +213,7 @@ exports.updateTask = async (req, res) => {
     }
 };
 
+
 // @route   DELETE api/maids/:maidId/tasks/:taskId
 // @desc    Delete a task from a maid
 exports.deleteTaskFromMaid = async (req, res) => {
@@ -215,10 +222,9 @@ exports.deleteTaskFromMaid = async (req, res) => {
         if (!maid) { return res.status(404).json({ msg: 'Maid not found' }); }
         if (maid.user.toString() !== req.user.id) { return res.status(401).json({ msg: 'User not authorized' }); }
 
-        const removeIndex = maid.tasks.map(task => task.id).indexOf(req.params.taskId);
-        if (removeIndex === -1) { return res.status(404).json({ msg: 'Task not found' }); }
-
-        maid.tasks.splice(removeIndex, 1);
+        // Find the task by its _id and pull it from the array
+        maid.tasks.pull({ _id: req.params.taskId });
+        
         await maid.save();
         res.json({ msg: 'Task removed' });
 
@@ -253,7 +259,13 @@ exports.calculatePayroll = async (req, res) => {
             else if (task.frequency.toLowerCase() === 'weekly') expectedWorkDays = 4;
             else expectedWorkDays = daysInMonth;
             const costPerDay = expectedWorkDays > 0 ? task.price / expectedWorkDays : 0;
-            const daysWorked = maid.attendance.filter(r => r.taskName === task.name && new Date(r.date) >= startDate && new Date(r.date) < endDate).length;
+            // Filter for 'Present' status
+            const daysWorked = maid.attendance.filter(r => 
+                r.taskName === task.name && 
+                r.status === 'Present' && // Only count "Present"
+                new Date(r.date) >= startDate && 
+                new Date(r.date) < endDate
+            ).length;
             const missedDays = expectedWorkDays - daysWorked;
             if (missedDays > 0) {
                 const deduction = missedDays * costPerDay;
@@ -279,7 +291,8 @@ exports.requestAttendanceOtp = async (req, res) => {
         if (!maid) { return res.status(404).json({ msg: 'Maid not found' }); }
         if (maid.user.toString() !== req.user.id) { return res.status(401).json({ msg: 'User not authorized' }); }
 
-        const formattedPhoneNumber = formatToE164(maid.mobile);
+        // --- FIX: Use 'mobileNo' to match the schema ---
+        const formattedPhoneNumber = formatToE164(maid.mobileNo);
         if (!formattedPhoneNumber) {
             return res.status(400).json({ msg: 'Maid does not have a valid mobile number.' });
         }
@@ -288,7 +301,8 @@ exports.requestAttendanceOtp = async (req, res) => {
             .verifications
             .create({ to: formattedPhoneNumber, channel: 'sms' });
         
-        res.json({ msg: `A verification code has been sent to ${maid.mobile}.` });
+        // --- FIX: Use 'mobileNo' in response ---
+        res.json({ msg: `A verification code has been sent to ${maid.mobileNo}.` });
 
     } catch (err) {
         console.error("Twilio Verify Error:", err.message);
@@ -307,7 +321,8 @@ exports.verifyOtpAndMarkAttendance = async (req, res) => {
         const maid = await Maid.findById(req.params.maidId);
         if (!maid) { return res.status(404).json({ msg: 'Maid not found' }); }
 
-        const formattedPhoneNumber = formatToE164(maid.mobile);
+        // --- FIX: Use 'mobileNo' to match the schema ---
+        const formattedPhoneNumber = formatToE164(maid.mobileNo);
         if (!formattedPhoneNumber) {
             return res.status(400).json({ msg: 'Cannot verify OTP for a maid with no mobile number.' });
         }
@@ -318,7 +333,7 @@ exports.verifyOtpAndMarkAttendance = async (req, res) => {
 
         if (verification_check.status === 'approved') {
             maid.attendance.unshift({
-                date: new Date(),
+                date: new Date(), // Stored in UTC
                 taskName: taskName,
                 status: 'Present'
             });
@@ -357,6 +372,7 @@ exports.addManualAttendanceRecord = async (req, res) => {
             return res.status(401).json({ msg: 'User not authorized' });
         }
 
+        // Create a Date object assuming the input 'date' (YYYY-MM-DD) is in UTC.
         const attendanceDate = new Date(Date.parse(date + 'T00:00:00.000Z'));
         if (isNaN(attendanceDate)) {
              console.error(`[ERROR] Invalid date format received: ${date}`);
