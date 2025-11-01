@@ -63,8 +63,7 @@ exports.addMaid = async (req, res) => {
         return res.status(400).json({ msg: 'Please provide name, mobile, and address.' });
     }
     try {
-        // --- FIX: Use 'mobileNo' to match the schema ---
-        const newMaid = new Maid({ name, mobileNo: mobile, address, user: req.user.id });
+        const newMaid = new Maid({ name, mobile, address, user: req.user.id });
         console.log('[DEBUG] Saving new maid document to database...');
         const maid = await newMaid.save();
         console.log('[SUCCESS] Maid saved successfully. Maid ID:', maid.id);
@@ -85,8 +84,7 @@ exports.updateMaid = async (req, res) => {
     // Build maid object
     const maidFields = {};
     if (name) maidFields.name = name;
-    // --- FIX: Use 'mobileNo' to match the schema ---
-    if (mobile) maidFields.mobileNo = mobile;
+    if (mobile) maidFields.mobile = mobile;
     if (address) maidFields.address = address;
 
     try {
@@ -291,8 +289,7 @@ exports.requestAttendanceOtp = async (req, res) => {
         if (!maid) { return res.status(404).json({ msg: 'Maid not found' }); }
         if (maid.user.toString() !== req.user.id) { return res.status(401).json({ msg: 'User not authorized' }); }
 
-        // --- FIX: Use 'mobileNo' to match the schema ---
-        const formattedPhoneNumber = formatToE164(maid.mobileNo);
+        const formattedPhoneNumber = formatToE164(maid.mobile);
         if (!formattedPhoneNumber) {
             return res.status(400).json({ msg: 'Maid does not have a valid mobile number.' });
         }
@@ -301,8 +298,8 @@ exports.requestAttendanceOtp = async (req, res) => {
             .verifications
             .create({ to: formattedPhoneNumber, channel: 'sms' });
         
-        // --- FIX: Use 'mobileNo' in response ---
-        res.json({ msg: `A verification code has been sent to ${maid.mobileNo}.` });
+        
+        res.json({ msg: `A verification code has been sent to ${maid.mobile}.` });
 
     } catch (err) {
         console.error("Twilio Verify Error:", err.message);
@@ -321,8 +318,7 @@ exports.verifyOtpAndMarkAttendance = async (req, res) => {
         const maid = await Maid.findById(req.params.maidId);
         if (!maid) { return res.status(404).json({ msg: 'Maid not found' }); }
 
-        // --- FIX: Use 'mobileNo' to match the schema ---
-        const formattedPhoneNumber = formatToE164(maid.mobileNo);
+        const formattedPhoneNumber = formatToE164(maid.mobile);
         if (!formattedPhoneNumber) {
             return res.status(400).json({ msg: 'Cannot verify OTP for a maid with no mobile number.' });
         }
