@@ -347,6 +347,28 @@ exports.verifyOtpAndMarkAttendance = async (req, res) => {
             .create({ to: formattedPhoneNumber, code: otp });
 
         if (verification_check.status === 'approved') {
+            // --- NEW CHECK ---
+            // Get the start of today in UTC
+            const today = new Date();
+            today.setUTCHours(0, 0, 0, 0);
+
+            // Check if attendance for this task on this day already exists
+            const alreadyMarked = maid.attendance.some(record => {
+                const recordDate = new Date(record.date);
+                recordDate.setUTCHours(0, 0, 0, 0);
+                // Check for this task, on this day, with "Present" status
+                return record.taskName === taskName && 
+                       recordDate.getTime() === today.getTime() &&
+                       record.status === 'Present';
+            });
+
+            if (alreadyMarked) {
+                console.log(`[WARN] Attendance for task "${taskName}" already marked today for maid ${maid.id}`);
+                // Return a 400 Bad Request with a specific message
+                return res.status(400).json({ msg: `Attendance for ${taskName} already marked today.` });
+            }
+            // --- END NEW CHECK ---
+
             maid.attendance.unshift({
                 date: new Date(), // Stored in UTC
                 taskName: taskName,
@@ -393,6 +415,24 @@ exports.addManualAttendanceRecord = async (req, res) => {
              console.error(`[ERROR] Invalid date format received: ${date}`);
              return res.status(400).json({ msg: 'Invalid date format. Please use YYYY-MM-DD.' });
         }
+
+        // --- NEW CHECK ---
+        // Check if attendance for this task on this specific date already exists
+        const attendanceDateTime = attendanceDate.getTime();
+        const alreadyMarked = maid.attendance.some(record => {
+            const recordDate = new Date(record.date);
+            recordDate.setUTCHours(0, 0, 0, 0); // Normalize existing records to midnight UTC
+            // Check for this task, on this day, with "Present" status
+            return record.taskName === taskName && 
+                   recordDate.getTime() === attendanceDateTime &&
+                   record.status === 'Present';
+        });
+
+        if (alreadyMarked) {
+            console.log(`[WARN] Manual attendance for task "${taskName}" already marked on ${date} for maid ${maid.id}`);
+            return res.status(400).json({ msg: `Attendance for ${taskName} already marked on ${date}.` });
+        }
+        // --- END NEW CHECK ---
 
         maid.attendance.unshift({
             date: attendanceDate,
