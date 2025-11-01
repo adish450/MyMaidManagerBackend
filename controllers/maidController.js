@@ -224,7 +224,7 @@ exports.deleteTaskFromMaid = async (req, res) => {
         maid.tasks.pull({ _id: req.params.taskId });
         
         await maid.save();
-        res.json({ msg: 'Task removed' });
+        res.json(maid); // Send back the entire updated maid object
 
     } catch (err) {
         console.error(err.message);
