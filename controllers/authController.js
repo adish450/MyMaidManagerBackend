@@ -1,5 +1,4 @@
 const User = require('../models/User');
-const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 // @route   POST api/auth/register
@@ -23,10 +22,7 @@ exports.registerUser = async (req, res) => {
             password
         });
 
-        // Encrypt password
-        const salt = await bcrypt.genSalt(10);
-        user.password = await bcrypt.hash(password, salt);
-
+        // Save user (password will be hashed by User model pre-save middleware)
         await user.save();
 
         // Return jsonwebtoken
@@ -66,7 +62,8 @@ exports.loginUser = async (req, res) => {
             return res.status(400).json({ msg: 'Invalid credentials' });
         }
 
-        const isMatch = await bcrypt.compare(password, user.password);
+        // Use model helper to compare password (uses bcrypt under the hood)
+        const isMatch = await user.matchPassword(password);
 
         if (!isMatch) {
             return res.status(400).json({ msg: 'Invalid credentials' });
