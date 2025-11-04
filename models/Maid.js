@@ -7,7 +7,8 @@ const MaidSchema = new mongoose.Schema({
     },
     mobile: {
         type: String,
-        required: true
+        required: true,
+        unique: true
     },
     address: {
         type: String,
