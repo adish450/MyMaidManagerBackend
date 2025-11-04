@@ -195,10 +195,26 @@ exports.updateTask = async (req, res) => {
             return res.status(404).json({ msg: 'Task not found' });
         }
 
+        // --- FIX: Get old task name BEFORE updating ---
+        const oldTaskName = task.name;
+        const newTaskName = name;
+        // --- END FIX ---
+
         // Update the task properties
         task.name = name;
         task.price = price;
         task.frequency = frequency;
+
+        // --- FIX: If task name changed, update all attendance records ---
+        if (oldTaskName !== newTaskName) {
+            console.log(`[DEBUG] Task name changed from "${oldTaskName}" to "${newTaskName}". Updating attendance records...`);
+            maid.attendance.forEach(record => {
+                if (record.taskName === oldTaskName) {
+                    record.taskName = newTaskName;
+                }
+            });
+        }
+        // --- END FIX ---
 
         await maid.save();
         
