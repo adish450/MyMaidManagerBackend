@@ -438,21 +438,23 @@ exports.addManualAttendanceRecord = async (req, res) => {
         }
 
         // Create a Date object assuming the input 'date' (YYYY-MM-DD) is in UTC.
-        const attendanceDate = new Date(Date.parse(date + 'T00:00:00.000Z'));
-        if (isNaN(attendanceDate)) {
+        const selectedDate = new Date(Date.parse(date + 'T00:00:00.000Z'));
+        if (isNaN(selectedDate)) {
              console.error(`[ERROR] Invalid date format received: ${date}`);
              return res.status(400).json({ msg: 'Invalid date format. Please use YYYY-MM-DD.' });
         }
 
-        // --- NEW CHECK ---
-        // Check if attendance for this task on this specific date already exists
-        const attendanceDateTime = attendanceDate.getTime();
+        // --- UPDATED CHECK ---
+        // Check if attendance for this task on this specific date *day* already exists
+        const selectedDayStart = selectedDate.getTime(); // Midnight UTC
+        const selectedDayEnd = selectedDayStart + (24 * 60 * 60 * 1000); // Midnight next day UTC
+
         const alreadyMarked = maid.attendance.some(record => {
-            const recordDate = new Date(record.date);
-            recordDate.setUTCHours(0, 0, 0, 0); // Normalize existing records to midnight UTC
-            // Check for this task, on this day, with "Present" status
+            const recordTime = new Date(record.date).getTime();
+            // Check if record falls on the selected day
             return record.taskName === taskName && 
-                   recordDate.getTime() === attendanceDateTime &&
+                   recordTime >= selectedDayStart &&
+                   recordTime < selectedDayEnd &&
                    record.status === 'Present';
         });
 
@@ -460,10 +462,24 @@ exports.addManualAttendanceRecord = async (req, res) => {
             console.log(`[WARN] Manual attendance for task "${taskName}" already marked on ${date} for maid ${maid.id}`);
             return res.status(400).json({ msg: `Attendance for ${taskName} already marked on ${date}.` });
         }
-        // --- END NEW CHECK ---
+        // --- END UPDATED CHECK ---
+
+        // --- NEW LOGIC: Combine selected date with current time ---
+        const now = new Date(); // Current system time
+        
+        // Create the new date in UTC by combining selected date with current time
+        const finalAttendanceDate = new Date(Date.UTC(
+            selectedDate.getUTCFullYear(),
+            selectedDate.getUTCMonth(),
+            selectedDate.getUTCDate(),
+            now.getUTCHours(),
+            now.getUTCMinutes(),
+            now.getUTCSeconds()
+        ));
+        // --- END NEW LOGIC ---
 
         maid.attendance.unshift({
-            date: attendanceDate,
+            date: finalAttendanceDate, // Use the combined date
             taskName: taskName,
             status: 'Present' // --- LOGIC CHANGE: Always mark as 'Present' ---
         });
