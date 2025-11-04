@@ -220,8 +220,20 @@ exports.deleteTaskFromMaid = async (req, res) => {
         if (!maid) { return res.status(404).json({ msg: 'Maid not found' }); }
         if (maid.user.toString() !== req.user.id) { return res.status(401).json({ msg: 'User not authorized' }); }
 
+        // --- FIX: Find task to get its name BEFORE deleting ---
+        const taskToDelete = maid.tasks.id(req.params.taskId);
+        if (!taskToDelete) {
+            return res.status(404).json({ msg: 'Task not found' });
+        }
+        const taskName = taskToDelete.name;
+        // --- END FIX ---
+
         // Find the task by its _id and pull it from the array
         maid.tasks.pull({ _id: req.params.taskId });
+        
+        // --- FIX: Add logic to also remove associated attendance records ---
+        maid.attendance = maid.attendance.filter(record => record.taskName !== taskName);
+        // --- END FIX ---
         
         await maid.save();
         res.json(maid); // Send back the entire updated maid object
