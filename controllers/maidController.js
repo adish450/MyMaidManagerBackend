@@ -493,3 +493,53 @@ exports.addManualAttendanceRecord = async (req, res) => {
         res.status(500).send('Server Error');
     }
 };
+
+// @route   POST api/maids/:maidId/notes
+// @desc    Add a note to a specific maid for a specific date
+// @access  Private
+exports.addNoteToMaid = async (req, res) => {
+    const { date, text } = req.body;
+    console.log(`[API] POST /api/maids/${req.params.maidId}/notes - Received request.`);
+    console.log('[DEBUG] Request Body:', req.body);
+
+    if (!date || !text) {
+        console.error('[ERROR] Validation failed: Missing date or text.');
+        return res.status(400).json({ msg: 'Please provide both a date and note text.' });
+    }
+
+    try {
+        const maid = await Maid.findById(req.params.maidId);
+        if (!maid) {
+            console.error(`[ERROR] Maid not found with ID: ${req.params.maidId}`);
+            return res.status(404).json({ msg: 'Maid not found' });
+        }
+        if (maid.user.toString() !== req.user.id) {
+            console.error(`[ERROR] User ${req.user.id} not authorized for maid ${req.params.maidId}`);
+            return res.status(401).json({ msg: 'User not authorized' });
+        }
+
+        // Create a Date object, assuming the input 'date' (YYYY-MM-DD) is in UTC.
+        const noteDate = new Date(Date.parse(date + 'T00:00:00.000Z'));
+        if (isNaN(noteDate)) {
+             console.error(`[ERROR] Invalid date format received: ${date}`);
+             return res.status(400).json({ msg: 'Invalid date format. Please use YYYY-MM-DD.' });
+        }
+
+        const newNote = {
+            date: noteDate,
+            text: text
+        };
+
+        maid.notes.unshift(newNote); // Add the new note to the beginning of the array
+
+        await maid.save();
+        console.log(`[SUCCESS] Note added for maid "${maid.name}" on date ${date}.`);
+        
+        // Return the full updated maid object so the app state is in sync
+        res.json(maid); 
+
+    } catch (err) {
+        console.error('[ERROR] Database save error in addNoteToMaid:', err.message);
+        res.status(500).send('Server Error');
+    }
+};

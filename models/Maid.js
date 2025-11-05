@@ -7,8 +7,7 @@ const MaidSchema = new mongoose.Schema({
     },
     mobile: {
         type: String,
-        required: true,
-        unique: true
+        required: true
     },
     address: {
         type: String,
@@ -28,6 +27,11 @@ const MaidSchema = new mongoose.Schema({
         date: Date,
         taskName: String,
         status: String
+    }],
+    notes: [{
+        date: Date, // The date the note is for
+        text: String, // The content of the note
+        createdAt: { type: Date, default: Date.now } // When the note was added
     }]
 });
 
